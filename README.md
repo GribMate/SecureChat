@@ -1,0 +1,2 @@
+# SecureChat
+Biztonsági protokollok HF
