@@ -1,11 +1,18 @@
 #PyCryptodome functions
+
 from Crypto.Cipher import AES
 from Crypto.PublicKey import RSA
 from Crypto.Random import get_random_bytes
 
+
+# -------------------------------------------------- SETTINGS --------------------------------------------------
+
 AES_MODE = AES.MODE_GCM # The AES mode that the client will use to encrypt and decrypt messages
 RSA_KEY_FORMAT = "PEM" # The formatting of saved keys (PEM, DEC or OpenSSH)
 RSA_KEY_BITS = 2048 # Bit length of the RSA keys used (default is 2048, 1024 and 3072 is standardized as well)
+
+
+# -------------------------------------------------- FUNCTIONS --------------------------------------------------
 
 # Encrypts a text message with a given 16 byte long key and returns the data needed to decrypt later
 def encryptMessage(key, plaintext):
@@ -38,16 +45,3 @@ def readKeyFromFile(path, password):
 # Generates a public key komponent from a private RSA key
 def getPublicKeyFromPrivateKey(privateKey):
     return privateKey.publickey()
-
-
-
-# TODO: törölni, tesztkód
-key = createPrivateKey()
-saveKeyToFile(key, "mykey.pem", "EgyJelszoLol")
-keyRead = readKeyFromFile("mykey.pem", "EgyJelszoLol")
-public = getPublicKeyFromPrivateKey(keyRead)
-saveKeyToFile(public, "mykeyPublic.pem", "MasikJelszo")
-
-pwd = b"1234567890123456"
-secretMessage, mactag, nonce = encryptMessage(pwd, "My secret message.")
-decryptedMessage = decryptMessage(pwd, nonce, mactag, secretMessage)
