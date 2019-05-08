@@ -15,10 +15,10 @@ sio.attach(app)
 #Aiohttp endpoint definition
 async def index(request):
     with open('index.html') as f:
-        return web.Response(text=f.read(), content_type='text/html')
+        return web.Response(text = f.read(), content_type = 'text/html')
 
 #Init users array
-if open("users.txt").read()=="":
+if open("users.txt").read() == "":
     users =  {}
 else:
      users = eval(open("myfile.txt").read())
