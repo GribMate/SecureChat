@@ -7,27 +7,29 @@ sio = socketio.AsyncServer()
 # Creates a new Aiohttp Web Application
 app = web.Application()
 
+# Binds our Socket.IO server to our Web App instance
 sio.attach(app)
 
+#Aiohttp endpoint definition
 async def index(request):
     with open('index.html') as f:
         return web.Response(text=f.read(), content_type='text/html')
 
-users = {}
+#Init users array
+if open("users.txt").read()=="":
+    users =  {}
+else:
+     users = eval(open("myfile.txt").read())
 
-@sio.on('message')
-async def print_message(sid, message):
-    # When we receive a new event of type
-    # 'message' through a socket.io connection
-    # we print the socket ID and the message
-    print("Socket ID: " , sid)
-    print(message)
-
+#User registration
 @sio.on('register')
 async def register_user(sid, message):
     print(message)
     users[message['un']] = message['pw']
+    with open('users.txt', 'w') as f:
+        print(users, file=f)
 
+#User login
 @sio.on('login')
 async def login_user(sid, message):
     if message['un'] in users:

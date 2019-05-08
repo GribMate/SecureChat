@@ -2,20 +2,26 @@ import socketio
 from aiohttp import web
 import time
 
+# Socket.io client definition
 sio = socketio.Client()
 
+# Connection function
 @sio.on('connect')
 def on_connect():
     print('Client connected')
 
+# Message function
 @sio.on('message')
 def on_message(data):
     print('I received a message!')
 
+# Disconnection function
 @sio.on('disconnect')
 def on_disconnect():
     print('I\'m disconnected!')
 
+# Login authentication
+# If response == Yes we login with the given user
 @sio.on('login_auth')
 def auth(message):
     if message['response'] == 'Yes':
@@ -24,6 +30,9 @@ def auth(message):
         print(message['response']+ '\n')
         login()
 
+# Registration function
+# If the user filled all the requested fields correctly, 
+# we send the data in a dictionary to the server
 def register():
     while True:
         username = input('Your username: ')
@@ -46,6 +55,7 @@ def register():
     print('Account has been created\n')
     print('Options: register | login | exit')
 
+# Login function
 def login():
     while True:
         username = input('Username: ')
@@ -62,16 +72,21 @@ def login():
 
     sio.emit('login', {'un' : username, 'pw' : password})
 
+# User session for chat 
+# If the login was successful we call this function
 def user_session(username):
     print('Welcome ' + username)
     print('Options: logout | create_group | join_group | delete_group')
     while True:
         option = input(username + ' > ')
         if option == 'logout':
+            print("Logging out...")
             break
-    
+
+# Socket connection with the server
 sio.connect('http://localhost:8080')
 
+# Default messages after the application started
 print('Options: register | login | exit')
 
 while True:
