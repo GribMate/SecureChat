@@ -1,8 +1,11 @@
 import os, socketio, time
 from aiohttp import web
+import clientCrypto
 
 
 # -------------------------------------------------- GLOBAL VARIABLES --------------------------------------------------
+
+PRIVATE_KEY_FILE_PATH = "myPrivateKey.pem" # The path that the client saves its private RSA key file
 
 # Socket.io client definition
 sio = socketio.Client()
@@ -43,7 +46,7 @@ def auth(message):
         # If response == Yes we login with the given user
         userLoggedIn = True
         processingCommand = False
-        return userSessionLoop(message["un"])
+        return userSessionLoop(message["userName"])
     else:
         print(message["response"]+ "\n")
         processingCommand = False
@@ -77,7 +80,12 @@ def client_register():
             break
     
     print("Creating account...")
-    sio.emit("server_register", {"un" : username, "pw" : password})
+
+    privateKey = clientCrypto.createPrivateKey() # Generating RSA key
+    clientCrypto.saveKeyToFile(privateKey, PRIVATE_KEY_FILE_PATH, password) # Saving encrpyted private key locally
+    publicKey = clientCrypto.getPublicKeyFromPrivateKey(privateKey) # Public key component to send to the server
+
+    sio.emit("server_register", {"userName": username, "password": password, "publicKey": publicKey})
     time.sleep(1)
     print("Account has been created.\n")
     processingCommand = False
@@ -97,7 +105,7 @@ def client_login():
         else:
             break
 
-    sio.emit("server_login", {"un" : username, "pw" : password})
+    sio.emit("server_login", {"userName": username, "password": password})
 
 
 # Default message loop after the application started
@@ -132,17 +140,28 @@ def userSessionLoop(username):
     global userLoggedIn
     clearConsole()
     print("\n\nWelcome " + username + "! :)")
-    print("Available commands: logout | create_group | join_group | delete_group")
+    print("Available commands: create_group | join_group | delete_group | logout")
     while True:
         while processingCommand: # If we are already processing an async command, we shouldn't spam the output, so we wait
             time.sleep(0.1)
         # We aren't in a command processing (anymore)
         option = input(username + " > ")
-        if option == "logout":
+        if option == "create_group":
+            processingCommand = True
+            print("TODO")
+        elif option == "join_group":
+            processingCommand = True
+            print("TODO")
+        elif option == "delete_group":
+            processingCommand = True
+            print("TODO")
+        elif option == "logout":
             print("Logging out...")
             userLoggedIn = False
             processingCommand = False
             break
+        else:
+            print("\"" + option + "\" is not a valid option!")
 
 
 # -------------------------------------------------- MAIN --------------------------------------------------

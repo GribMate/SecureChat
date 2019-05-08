@@ -44,4 +44,4 @@ def readKeyFromFile(path, password):
 
 # Generates a public key komponent from a private RSA key
 def getPublicKeyFromPrivateKey(privateKey):
-    return privateKey.publickey()
+    return privateKey.publickey().export_key(RSA_KEY_FORMAT)

@@ -1,2 +1,3 @@
 *.pem
 users.txt
+__pycache__/*.*
