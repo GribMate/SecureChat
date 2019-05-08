@@ -1,7 +1,10 @@
 from aiohttp import web
 import socketio
 
-
+# Array to store chanels
+channels = []
+default_channel = "defualt"
+channels.append(default_channel)
 
 # Creates a new Async Socket IO Server
 sio = socketio.AsyncServer()
