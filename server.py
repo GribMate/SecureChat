@@ -21,7 +21,7 @@ async def index(request):
 if open("users.txt").read() == "":
     users =  {}
 else:
-     users = eval(open("myfile.txt").read())
+     users = eval(open("users.txt").read())
 
 #User registration
 @sio.on('register')
@@ -38,9 +38,9 @@ async def login_user(sid, message):
         if message['pw'] == users[message['un']]:
             await sio.emit('login_auth', {'response': 'Yes', 'un': message['un']})
         else:
-            await sio.emit('login_auth', {'response': 'First you should register...', 'un': ''})
+            await sio.emit('login_auth', {'response': 'Password is incorrect', 'un': ''}) 
     else:
-        await sio.emit('login_auth', {'response': 'Password is incorrect', 'un': ''}) 
+        await sio.emit('login_auth', {'response': 'First you should register...', 'un': ''})
 
 app.router.add_get('/', index)
 
