@@ -6,35 +6,42 @@ from aiohttp import web
 # Socket.io client definition
 sio = socketio.Client()
 
+# Shows if the "event loop" is currently working on something
+processingCommand = False
+
 # Connection function
 @sio.on('connect')
 def on_connect():
-    print('Client connected')
+    print('Client connected!')
 
 # Message function
 @sio.on('message')
 def on_message(data):
-    print('I received a message!')
+    print('I received a message!' + str(data, "UTF-8"))
 
 # Disconnection function
 @sio.on('disconnect')
 def on_disconnect():
     print('I\'m disconnected!')
 
+
+
 # Login authentication
-# If response == Yes we login with the given user
 @sio.on('login_auth')
 def auth(message):
+    global processingCommand
     if message['response'] == 'Yes':
+        # If response == Yes we login with the given user
         return user_session(message['un'])
     else:
         print(message['response']+ '\n')
-        login()
+    processingCommand = False
 
 # Registration function
 # If the user filled all the requested fields correctly, 
 # we send the data in a dictionary to the server
 def register():
+    global processingCommand
     while True:
         username = input('Your username: ')
         if len(username) < 3:
@@ -54,7 +61,7 @@ def register():
     sio.emit('register', {'un' : username, 'pw' : password})
     time.sleep(1)
     print('Account has been created\n')
-    print('Options: register | login | exit')
+    processingCommand = False
 
 # Login function
 def login():
@@ -91,10 +98,15 @@ sio.connect('http://localhost:8080')
 print('Options: register | login | exit')
 
 while True:
+    if processingCommand:
+        while processingCommand:
+            time.sleep(0.1)
     option = input('> ')
     if option == 'login':
+        processingCommand = True
         login()
     elif option == 'register':
+        processingCommand = True
         register()
     elif option == 'exit':
         break

@@ -8,15 +8,15 @@ RSA_KEY_FORMAT = "PEM" # The formatting of saved keys (PEM, DEC or OpenSSH)
 RSA_KEY_BITS = 2048 # Bit length of the RSA keys used (default is 2048, 1024 and 3072 is standardized as well)
 
 # Encrypts a text message with a given 16 byte long key and returns the data needed to decrypt later
-def encryptMessage(key, data):
+def encryptMessage(key, plaintext):
     cipher = AES.new(key, AES_MODE)
-    ciphertext, mactag = cipher.encrypt_and_digest(data)
+    ciphertext, mactag = cipher.encrypt_and_digest(plaintext.encode("UTF-8"))
     return ciphertext, mactag, cipher.nonce
 
 # Decrypts a text message with a given 16 byte long key
-def decryptMessage(key, nonce, mactag, data):
+def decryptMessage(key, nonce, mactag, ciphertext):
     cipher = AES.new(key, AES_MODE, nonce)
-    return cipher.decrypt_and_verify(data, mactag)
+    return str(cipher.decrypt_and_verify(ciphertext, mactag), "UTF-8")
 
 # Creates a private RSA key
 def createPrivateKey():
@@ -48,5 +48,6 @@ keyRead = readKeyFromFile("mykey.pem", "EgyJelszoLol")
 public = getPublicKeyFromPrivateKey(keyRead)
 saveKeyToFile(public, "mykeyPublic.pem", "MasikJelszo")
 
-secretMessage, mactag, nonce = encryptMessage(key, "My secret message.".encode("UTF-8"))
-decryptedMessage = decryptMessage(key, nonce, mactag, secretMessage)
+pwd = b"1234567890123456"
+secretMessage, mactag, nonce = encryptMessage(pwd, "My secret message.")
+decryptedMessage = decryptMessage(pwd, nonce, mactag, secretMessage)
