@@ -42,14 +42,19 @@ def on_disconnect():
 def auth(message):
     global processingCommand
     global userLoggedIn
-    if message["response"] == "Yes":
-        # If response == Yes we login with the given user
+    if message["response"] == "AUTH_SUCCESSFUL":
+        # If response is successful, we login with the given user
+        print("Login successful!")
         userLoggedIn = True
         processingCommand = False
         return userSessionLoop(message["userName"])
+    elif message["response"] == "INVALID_PWD":
+        print("Password is incorrect!")
+    elif message["response"] == "INVALID_USER":
+        print("User doesn't exist, please register first!")
     else:
-        print(message["response"]+ "\n")
-        processingCommand = False
+        print("Unknown login error happened (server response: " + message["response"] + ").\n")
+    processingCommand = False
 
 
 # -------------------------------------------------- CLIENT FUNCTIONS --------------------------------------------------
@@ -104,18 +109,25 @@ def client_login():
             print("Password can't be blank!")
         else:
             break
-
     sio.emit("server_login", {"userName": username, "password": password})
 
+# TODO
 def user_createGroup():
-    print("TODO")
+    global processingCommand
+    print("TODO") # TODO
+    processingCommand = False
 
+# TODO
 def user_joinGroup():
-    print("TODO")
+    global processingCommand
+    print("TODO") # TODO
+    processingCommand = False
 
+# TODO
 def user_deleteGroup():
-    print("TODO")
-
+    global processingCommand
+    print("TODO") # TODO
+    processingCommand = False
 
 # Default message loop after the application started
 def defaultLoop():
@@ -148,7 +160,7 @@ def userSessionLoop(username):
     global processingCommand
     global userLoggedIn
     clearConsole()
-    print("\n\nWelcome " + username + "! :)")
+    print("\n\nWelcome " + username + "! :)\n")
     print("Available commands: create_group | join_group | delete_group | logout")
     while True:
         while processingCommand: # If we are already processing an async command, we shouldn't spam the output, so we wait

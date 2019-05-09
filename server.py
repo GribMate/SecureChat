@@ -25,6 +25,7 @@ groups = {}
 # User registration
 @sio.on("server_register")
 async def register_user(sid, message):
+    print(sid)
     print(message)
     users[message["userName"]] = {"password": message["password"], "publicKey": message["publicKey"] }
     with open(USERS_FILE_PATH, "w") as f:
@@ -35,11 +36,11 @@ async def register_user(sid, message):
 async def login_user(sid, message):
     if message["userName"] in users:
         if message["password"] == users[message["userName"]]["password"]:
-            await sio.emit("client_login_auth", {"response": "Yes", "userName": message["userName"]})
+            await sio.emit("client_login_auth", {"response": "AUTH_SUCCESSFUL", "userName": message["userName"]})
         else:
-            await sio.emit("client_login_auth", {"response": "Password is incorrect", "userName": ""}) 
+            await sio.emit("client_login_auth", {"response": "INVALID_PWD"}) 
     else:
-        await sio.emit("client_login_auth", {"response": "First you should register...", "userName": ""})
+        await sio.emit("client_login_auth", {"response": "INVALID_USER"})
 
 
 # -------------------------------------------------- SERVER INIT --------------------------------------------------
