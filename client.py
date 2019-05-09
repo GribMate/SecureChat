@@ -3,7 +3,7 @@ from aiohttp import web
 import clientCrypto
 
 
-# -------------------------------------------------- GLOBAL VARIABLES --------------------------------------------------
+# -------------------------------------------------- GLOBALS --------------------------------------------------
 
 PRIVATE_KEY_FILE_PATH = "myPrivateKey.pem" # The path that the client saves its private RSA key file
 
@@ -22,7 +22,7 @@ userLoggedIn = False
 # Connection function
 @sio.on("connect")
 def on_connect():
-    print("Client connected!")
+    print("Connection successful. Welcome to SecureChat!\n")
 
 # Message function
 @sio.on("message")
@@ -107,6 +107,15 @@ def client_login():
 
     sio.emit("server_login", {"userName": username, "password": password})
 
+def user_createGroup():
+    print("TODO")
+
+def user_joinGroup():
+    print("TODO")
+
+def user_deleteGroup():
+    print("TODO")
+
 
 # Default message loop after the application started
 def defaultLoop():
@@ -148,15 +157,15 @@ def userSessionLoop(username):
         option = input(username + " > ")
         if option == "create_group":
             processingCommand = True
-            print("TODO")
+            user_createGroup()
         elif option == "join_group":
             processingCommand = True
-            print("TODO")
+            user_joinGroup()
         elif option == "delete_group":
             processingCommand = True
-            print("TODO")
+            user_deleteGroup()
         elif option == "logout":
-            print("Logging out...")
+            print("Logging out...\n")
             userLoggedIn = False
             processingCommand = False
             break
@@ -165,6 +174,8 @@ def userSessionLoop(username):
 
 
 # -------------------------------------------------- MAIN --------------------------------------------------
+
+print("\n\nSecureChat client initializing:")
 
 # Socket connection with the server
 sio.connect("http://localhost:8080")

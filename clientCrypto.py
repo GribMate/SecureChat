@@ -2,7 +2,6 @@
 
 from Crypto.Cipher import AES
 from Crypto.PublicKey import RSA
-from Crypto.Random import get_random_bytes
 
 
 # -------------------------------------------------- SETTINGS --------------------------------------------------
@@ -31,15 +30,13 @@ def createPrivateKey():
 
 # Writes an RSA key to a file, encrypted by a password
 def saveKeyToFile(key, path, password):
-    file = open(path, "wb")
-    file.write(key.export_key(RSA_KEY_FORMAT, password))
-    file.close()
+    with open(path, "wb") as file:
+        file.write(key.export_key(RSA_KEY_FORMAT, password))
 
 # Reads an RSA key from a file, decrypts it with the given password
 def readKeyFromFile(path, password):
-    file = open(path, "r")
-    key = RSA.import_key(file.read(), password)
-    file.close()
+    with open(path, "r") as file:
+        key = RSA.import_key(file.read(), password)
     return key
 
 # Generates a public key komponent from a private RSA key
