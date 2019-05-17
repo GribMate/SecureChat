@@ -48,36 +48,6 @@ def on_disconnect():
     print("Client disconnected!")
 
 
-# -------------------------------------------------- CUSTOM CALLBACKS --------------------------------------------------
-
-# Login authentication
-@sio.on("client_login_auth")
-def auth(message):
-    global processingCommand
-    global userLoggedIn
-    global account_userName
-    global account_password
-    global account_privateKey
-    if message["response"] == "AUTH_SUCCESSFUL":
-        # If response is successful, we login with the given user
-        print("Login successful!")
-        userLoggedIn = True
-        account_userName = message["userName"]
-        account_privateKey = clientCrypto.readKeyFromFile(account_userName + ".pem", account_password)
-        processingCommand = False
-        return userSessionLoop()
-    elif message["response"] == "INVALID_PWD":
-        print("Password is incorrect!")
-    elif message["response"] == "INVALID_USER":
-        print("User doesn't exist, please register first!")
-    elif message["response"] == "ALREADY_LOGGED_IN":
-        print("User is already logged in!")
-    else:
-        print("Unknown login error happened (server response: " + message["response"] + ").\n")
-    account_password = ""
-    processingCommand = False
-
-
 # -------------------------------------------------- CLIENT FUNCTIONS --------------------------------------------------
 
 # Emtpies the console window
@@ -118,6 +88,7 @@ def client_register():
 # Login function
 def client_login():
     global account_password
+    global account_userName
     while True:
         username = input("Username: ")
         if len(username) < 1:
@@ -131,7 +102,28 @@ def client_login():
         else:
             break
     account_password = password
-    sio.emit("server_login", {"userName": username, "password": password})
+    account_userName = username
+    sio.emit("server_login", {"userName": username, "password": password}, callback = cb_user_login)
+
+# Login authentication
+def cb_user_login(response):
+    global processingCommand
+    global userLoggedIn
+    global account_userName
+    global account_password
+    global account_privateKey
+    if response == "AUTH_SUCCESSFUL":
+        # If response is successful, we login with the given user
+        print("Login successful!")
+        userLoggedIn = True
+        account_privateKey = clientCrypto.readKeyFromFile(account_userName + ".pem", account_password)
+        processingCommand = False
+        return userSessionLoop()
+    elif response == "ERROR":
+        print("Login error!")
+        account_password = ""
+        account_userName = ""
+    processingCommand = False
 
 # TODO
 def user_listGroups():

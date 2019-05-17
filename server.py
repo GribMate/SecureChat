@@ -41,13 +41,8 @@ async def login_user(sid, message):
         if message["password"] == users[message["userName"]]["password"]:
             if message["userName"] not in clients:
                 clients[message["userName"]] = sid
-                await sio.emit("client_login_auth", {"response": "AUTH_SUCCESSFUL", "userName": message["userName"]}, room = sid)
-            else:
-                await sio.emit("client_login_auth", {"response": "ALREADY_LOGGED_IN"}, room = sid)
-        else:
-            await sio.emit("client_login_auth", {"response": "INVALID_PWD"}, room = sid)
-    else:
-        await sio.emit("client_login_auth", {"response": "INVALID_USER"}, room = sid)
+                return "AUTH_SUCCESSFUL"
+    return "ERROR"
 
 # TODO
 @sio.on("server_getGroups")
@@ -108,10 +103,11 @@ def deleteGroup(sid, message):
 @sio.on("server_logout")
 def logout(sid, message):
     global groups
-    if message["userName"] in groups[message["groupName"]]["members"]:
-        groups[message["groupName"]]["members"].remove(message["userName"])
-        with open(GROUPS_FILE_PATH, "w") as f:
-            print(groups, file = f)
+    if len(message["groupName"]) > 2:
+        if message["userName"] in groups[message["groupName"]]["members"]:
+            groups[message["groupName"]]["members"].remove(message["userName"])
+            with open(GROUPS_FILE_PATH, "w") as f:
+                print(groups, file = f)
     del clients[message["userName"]]
 
 # TODO
