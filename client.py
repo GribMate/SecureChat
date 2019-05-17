@@ -222,8 +222,10 @@ def cb_user_joinGroup(response):
 # Attempts to leave a group
 def user_leaveGroup():
     global account_currentGroup
+    global processingCommand
     if len(account_currentGroup) < 3:
         print("You are not member of any group!")
+        processingCommand = False
     else:
         sio.emit("server_leaveGroup", {"groupName": account_currentGroup, "userName": account_userName}, callback = cb_user_leaveGroup)
     
