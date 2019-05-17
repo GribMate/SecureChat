@@ -61,7 +61,9 @@ def createGroup(sid, message):
 # TODO
 @sio.on("server_joinGroup")
 def userJoinGroup(sid, message):
-    if message["user"] in groups[message["groupName"]]["members"]:
+    if message["groupName"] not in groups:
+        return "GROUP_NOT_EXIST"
+    elif message["user"] in groups[message["groupName"]]["members"]:
         return "ALREADY_MEMBER"
     else:
         groups[message["groupName"]]["members"].append(message["user"])
@@ -72,13 +74,10 @@ def userJoinGroup(sid, message):
 # TODO
 @sio.on("server_leaveGroup")
 def userLeaveGroup(sid, message):
-    if message["user"] not in groups[message["groupName"]]["members"]:
-        return "NOT_MEMBER"
-    else:
-        groups[message["groupName"]]["members"].remove(message["user"])
-        with open(GROUPS_FILE_PATH, "w") as f:
-            print(groups, file = f)
-        return "OK"
+    groups[message["groupName"]]["members"].remove(message["user"])
+    with open(GROUPS_FILE_PATH, "w") as f:
+        print(groups, file = f)
+    return "OK"
 
 # TODO
 @sio.on("server_deleteGroup")
@@ -86,10 +85,13 @@ def deleteGroup(sid, message):
     if message["user"] != groups[message["groupName"]]["owner"]:
         return "NOT_OWNER"
     else:
-        del groups[message["groupName"]]
-        with open(GROUPS_FILE_PATH, "w") as f:
-            print(groups, file = f)
-        return "OK"
+        if message["groupName"] not in groups:
+            return "NOT_EXIST"
+        else:
+            del groups[message["groupName"]]
+            with open(GROUPS_FILE_PATH, "w") as f:
+                print(groups, file = f)
+            return "OK"
 
 
 # -------------------------------------------------- SERVER INIT --------------------------------------------------

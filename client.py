@@ -19,6 +19,9 @@ userLoggedIn = False
 # The username which identifies a user on the server
 account_userName = "" # TODO might need another ID
 
+# The group of which the user is currently a member of
+account_currentGroup = ""
+
 
 # -------------------------------------------------- DEFAULT CALLBACKS --------------------------------------------------
 
@@ -148,41 +151,54 @@ def cb_user_createGroup(response):
 
 # TODO
 def user_joinGroup():
+    global processingCommand
+    global account_currentGroup
+    if len(account_currentGroup) > 2:
+        print("You cannot join another group.")
+        processingCommand = False
+        return
+
     while True:
         groupname = input("Group name: ")
         if len(groupname) < 1:
             print("Group name can't be blank!")
         else:
+            account_currentGroup = groupname
             sio.emit("server_joinGroup", {"groupName": groupname, "user": account_userName}, callback = cb_user_joinGroup)
             break
 
 def cb_user_joinGroup(response):
     global processingCommand
+    global account_currentGroup
+    if (response == "GROUP_NOT_EXIST"):
+        account_currentGroup = "" # We clear the variable, since joining failed
+        print("The group does not exist.")
     if (response == "ALREADY_MEMBER"):
+        # We leave the variable as is, since user is a member of given group
         print("You are already a member of this group.")
     elif (response == "OK"):
+        # We leave the variable as is, since the join was successful
         print("You joined the group!")
     else:
+        account_currentGroup = "" # We clear the variable, since joining failed
         print("Unknown error happened during joining the group.")
     processingCommand = False
 
     # TODO
 def user_leaveGroup():
-    while True:
-        groupname = input("Group name: ")
-        if len(groupname) < 1:
-            print("Group name can't be blank!")
-        else:
-            sio.emit("server_leaveGroup", {"groupName": groupname, "user": account_userName}, callback = cb_user_leaveGroup)
-            break
+    global account_currentGroup
+    if len(account_currentGroup) < 1:
+        print("You are not member of any group!")
+    else:
+        sio.emit("server_leaveGroup", {"groupName": account_currentGroup, "user": account_userName}, callback = cb_user_leaveGroup)
     
 
 def cb_user_leaveGroup(response):
     global processingCommand
-    if (response == "NOT_MEMBER"):
-        print("You aren't a member of this group.")
-    elif (response == "OK"):
-         print("You left the group!")
+    global account_currentGroup
+    if (response == "OK"):
+        account_currentGroup = ""
+        print("You left the group!")
     else:
         print("Unknown error happened during leaving the group.")
     processingCommand = False
@@ -201,8 +217,10 @@ def cb_user_deleteGroup(response):
     global processingCommand
     if (response == "NOT_OWNER"):
         print("You aren't the owner of this group, so you cannot delete it!")
+    elif (response == "NOT_EXIST"):
+        print("The group does not exist!")
     elif (response == "OK"):
-        print("You deleted the group")
+        print("You deleted the group.")
     else:
         print("Unknown error happened during deleting the group.")
     processingCommand = False
@@ -240,27 +258,28 @@ def userSessionLoop():
     global processingCommand
     global userLoggedIn
     global account_userName
+    global account_currentGroup
     clearConsole()
     print("\n\nWelcome " + account_userName + "! :)\n")
-    print("Available commands: list_groups | create_group | join_group | leave_group | delete_group | logout")
+    print("Available commands: list | create | join | leave | delete | logout")
     while True:
         while processingCommand: # If we are already processing an async command, we shouldn't spam the output, so we wait
             time.sleep(0.1)
         # We aren't in a command processing (anymore)
-        option = input(account_userName + " > ")
-        if option == "list_groups":
+        option = input(account_userName + " (" + account_currentGroup + ") > ")
+        if option == "list":
             processingCommand = True
             user_listGroups()
-        elif option == "create_group":
+        elif option == "create":
             processingCommand = True
             user_createGroup()
-        elif option == "join_group":
+        elif option == "join":
             processingCommand = True
             user_joinGroup()
-        elif option == "leave_group":
+        elif option == "leave":
             processingCommand = True
             user_leaveGroup()
-        elif option == "delete_group":
+        elif option == "delete":
             processingCommand = True
             user_deleteGroup()
         elif option == "logout":
