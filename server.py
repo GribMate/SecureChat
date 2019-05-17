@@ -1,5 +1,5 @@
 from aiohttp import web
-import socketio
+import socketio, base64
 
 
 # -------------------------------------------------- GLOBALS --------------------------------------------------
@@ -19,14 +19,16 @@ users = {}
 # Public group data
 groups = {}
 
+# Active, currently logged in clients (is not persisted) - key: username, data: SID
+clients = {}
+
 
 # -------------------------------------------------- CALLBACKS --------------------------------------------------
 
 # User registration
 @sio.on("server_register")
 async def register_user(sid, message):
-    print(sid)
-    print(message)
+    global users
     users[message["userName"]] = {"password": message["password"], "publicKey": message["publicKey"] }
     with open(USERS_FILE_PATH, "w") as f:
         print(users, file = f)
@@ -34,13 +36,18 @@ async def register_user(sid, message):
 # User login
 @sio.on("server_login")
 async def login_user(sid, message):
+    global clients
     if message["userName"] in users:
         if message["password"] == users[message["userName"]]["password"]:
-            await sio.emit("client_login_auth", {"response": "AUTH_SUCCESSFUL", "userName": message["userName"]})
+            if message["userName"] not in clients:
+                clients[message["userName"]] = sid
+                await sio.emit("client_login_auth", {"response": "AUTH_SUCCESSFUL", "userName": message["userName"]}, room = sid)
+            else:
+                await sio.emit("client_login_auth", {"response": "ALREADY_LOGGED_IN"}, room = sid)
         else:
-            await sio.emit("client_login_auth", {"response": "INVALID_PWD"}) 
+            await sio.emit("client_login_auth", {"response": "INVALID_PWD"}, room = sid)
     else:
-        await sio.emit("client_login_auth", {"response": "INVALID_USER"})
+        await sio.emit("client_login_auth", {"response": "INVALID_USER"}, room = sid)
 
 # TODO
 @sio.on("server_getGroups")
@@ -50,6 +57,7 @@ def getGroups(sid):
 # TODO
 @sio.on("server_createGroup")
 def createGroup(sid, message):
+    global groups
     if message["groupName"] in groups.values():
         return "ALREADY_EXISTS"
     else:
@@ -61,6 +69,7 @@ def createGroup(sid, message):
 # TODO
 @sio.on("server_joinGroup")
 def userJoinGroup(sid, message):
+    global groups
     if message["groupName"] not in groups:
         return "GROUP_NOT_EXIST"
     elif message["userName"] in groups[message["groupName"]]["members"]:
@@ -74,6 +83,7 @@ def userJoinGroup(sid, message):
 # TODO
 @sio.on("server_leaveGroup")
 def userLeaveGroup(sid, message):
+    global groups
     groups[message["groupName"]]["members"].remove(message["userName"])
     with open(GROUPS_FILE_PATH, "w") as f:
         print(groups, file = f)
@@ -82,6 +92,7 @@ def userLeaveGroup(sid, message):
 # TODO
 @sio.on("server_deleteGroup")
 def deleteGroup(sid, message):
+    global groups
     if message["userName"] != groups[message["groupName"]]["owner"]:
         return "NOT_OWNER"
     else:
@@ -103,10 +114,31 @@ def getGroupMembers(sid, message):
     return membersData
 
 # TODO
-@sio.on("server_sendMessage")
-def sendMessage(sid, message):
-    # TODO
-    return
+@sio.on("server_passHandshake")
+async def passHandshake(sid, message):
+    targetName = message["targetUserName"]
+    senderName = message["senderUserName"]
+    encryptedSessionKey = base64.b64decode(message["encryptedSessionKey"])
+    if targetName in clients:
+        if senderName in users:
+            targetSID = clients[targetName]
+            publicKey = users[senderName]["publicKey"]
+            await sio.emit("client_receiveHandshake", {"senderUserName": senderName, "encryptedSessionKey": base64.b64encode(encryptedSessionKey),
+            "publicKey": publicKey}, room = targetSID)
+
+# TODO
+@sio.on("server_passMessage")
+async def passMessage(sid, message):
+    targetName = message["targetUserName"]
+    senderName = message["senderUserName"]
+    encryptedMessage = base64.b64decode(message["encryptedMessage"])
+    macTag = base64.b64decode(message["macTag"])
+    nonce = base64.b64decode(message["nonce"])
+    if targetName in clients:
+        if senderName in users:
+            targetSID = clients[targetName]
+            await sio.emit("client_receiveMessage", {"senderUserName": senderName, "encryptedMessage": base64.b64encode(encryptedMessage),
+            "macTag": base64.b64encode(macTag), "nonce": base64.b64encode(nonce)}, room = targetSID)
 
 
 # -------------------------------------------------- SERVER INIT --------------------------------------------------

@@ -1,4 +1,4 @@
-import os, socketio, time
+import os, socketio, time, base64
 from aiohttp import web
 import clientCrypto
 
@@ -70,6 +70,8 @@ def auth(message):
         print("Password is incorrect!")
     elif message["response"] == "INVALID_USER":
         print("User doesn't exist, please register first!")
+    elif message["response"] == "ALREADY_LOGGED_IN":
+        print("User is already logged in!")
     else:
         print("Unknown login error happened (server response: " + message["response"] + ").\n")
     account_password = ""
@@ -110,7 +112,6 @@ def client_register():
     publicKey = clientCrypto.getPublicKeyFromPrivateKey(privateKey) # Public key component to send to the server
 
     sio.emit("server_register", {"userName": username, "password": password, "publicKey": publicKey})
-    time.sleep(1)
     print("Account has been created.\n")
     processingCommand = False
 
@@ -270,8 +271,9 @@ def cb_sendMessage(targetUsers):
             print("Message cannot be blank!")
         else:
             for targetUser in targetUsers:
-                checkOrBuildSession(targetUser["userName"], targetUser["publicKey"])
-                sendMessageToTarget(targetUser["userName"], message)
+                if targetUser["userName"] != account_userName:
+                    checkOrBuildSession(targetUser["userName"], targetUser["publicKey"])
+                    sendMessageToTarget(targetUser["userName"], message)
             break
     processingCommand = False
 
@@ -279,34 +281,46 @@ def checkOrBuildSession(userName, publicKey):
     global sessions
     if userName not in sessions:
         sessions[userName] = {"sessionKey": clientCrypto.generateSessionKey(), "publicKey": publicKey, "handshakeDone": "False"}
-        doHandshakeWithUser(userName)
+        sendHandshake(userName)
     elif sessions[userName]["handshakeDone"] == "False":
-        doHandshakeWithUser(userName)
+        sendHandshake(userName)
 
-def doHandshakeWithUser(userName):
+def sendHandshake(userName):
     global sessions
+    global account_userName
     sessionKey = sessions[userName]["sessionKey"]
-    publicKey = sessions[userName]["publicKey"]
+    publicKey =  clientCrypto.getKeyFromEncodedData(sessions[userName]["publicKey"])
     encryptedSessionKey = clientCrypto.encryptSessionKey(sessionKey, publicKey)
-    # TODO: send encryptedSessionKey to the other client through the server
+    sio.emit("server_passHandshake", {"senderUserName": account_userName, "targetUserName": userName,
+    "encryptedSessionKey": base64.b64encode(encryptedSessionKey)})
     sessions[userName]["handshakeDone"] = "True"
 
 def sendMessageToTarget(userName, message):
     global sessions
     sessionKey = sessions[userName]["sessionKey"]
     encryptedMessage, macTag, nonce = clientCrypto.encryptMessage(sessionKey, message)
-    # TODO send data to the other client through the server
+    sio.emit("server_passMessage", {"senderUserName": account_userName, "targetUserName": userName,
+    "encryptedMessage": base64.b64encode(encryptedMessage), "macTag": base64.b64encode(macTag), "nonce": base64.b64encode(nonce)})
 
-def handleIncomingHandshake(userName, encryptedSessionKey, publicKey):
+@sio.on("client_receiveHandshake")
+def receiveHandshake(message):
     global account_privateKey
     global sessions
+    userName = message["senderUserName"]
+    encryptedSessionKey = base64.b64decode(message["encryptedSessionKey"])
+    publicKey = message["publicKey"]
     sessionKey = clientCrypto.decryptSessionKey(encryptedSessionKey, account_privateKey)
     if userName in sessions:
         del sessions[userName] # We renew the session anyway on an incoming handshake request
     sessions[userName] = {"sessionKey": sessionKey, "publicKey": publicKey, "handshakeDone": "True"}
 
-def handleIncomingMessage(userName, encryptedMessage, macTag, nonce):
+@sio.on("client_receiveMessage")
+def receiveMessage(message):
     global sessions
+    userName = message["senderUserName"]
+    encryptedMessage = base64.b64decode(message["encryptedMessage"])
+    macTag = base64.b64decode(message["macTag"])
+    nonce = base64.b64decode(message["nonce"])
     if userName in sessions:
         if sessions[userName]["handshakeDone"] == "True":
             sessionKey = sessions[userName]["sessionKey"]

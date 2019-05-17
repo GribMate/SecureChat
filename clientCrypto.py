@@ -49,6 +49,10 @@ def readKeyFromFile(path, password):
         key = RSA.import_key(file.read(), password)
     return key
 
+# Reads a (public) encoded RSA key and builds the key object from it
+def getKeyFromEncodedData(data):
+    return RSA.import_key(data) 
+
 # Generates a public key komponent from a private RSA key
 def getPublicKeyFromPrivateKey(privateKey):
     return privateKey.publickey().export_key(RSA_KEY_FORMAT)
