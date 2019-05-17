@@ -47,7 +47,7 @@ async def login_user(sid, message):
 # TODO
 @sio.on("server_getGroups")
 def getGroups(sid):
-    return groups # TODO just the names
+    return list(groups.keys()) # TODO just the names
 
 # TODO
 @sio.on("server_createGroup")
@@ -56,7 +56,7 @@ def createGroup(sid, message):
     if message["groupName"] in groups.values():
         return "ALREADY_EXISTS"
     else:
-        groups[message["groupName"]] = {"owner": message["owner"], "members": []} # TODO: proper data storage
+        groups[message["groupName"]] = {"owner": message["owner"], "members": []}
         with open(GROUPS_FILE_PATH, "w") as f:
             print(groups, file = f)
         return "OK"

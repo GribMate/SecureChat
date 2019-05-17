@@ -132,7 +132,9 @@ def user_listGroups():
 
 def cb_user_listGroups(response):
     global processingCommand
-    print(response)
+    print("Currently available groups:")
+    for groupName in response:
+        print(groupName)
     processingCommand = False
 
 # TODO
