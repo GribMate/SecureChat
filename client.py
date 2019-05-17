@@ -16,6 +16,9 @@ processingCommand = False
 # Shows if the user is authenticated successfully by the server and is logged in currently
 userLoggedIn = False
 
+# The username which identifies a user on the server
+account_userName = "" # TODO might need another ID
+
 
 # -------------------------------------------------- DEFAULT CALLBACKS --------------------------------------------------
 
@@ -42,12 +45,14 @@ def on_disconnect():
 def auth(message):
     global processingCommand
     global userLoggedIn
+    global account_userName
     if message["response"] == "AUTH_SUCCESSFUL":
         # If response is successful, we login with the given user
         print("Login successful!")
         userLoggedIn = True
+        account_userName = message["userName"]
         processingCommand = False
-        return userSessionLoop(message["userName"])
+        return userSessionLoop()
     elif message["response"] == "INVALID_PWD":
         print("Password is incorrect!")
     elif message["response"] == "INVALID_USER":
@@ -112,22 +117,97 @@ def client_login():
     sio.emit("server_login", {"userName": username, "password": password})
 
 # TODO
-def user_createGroup():
+def user_listGroups():
+    sio.emit("server_getGroups", callback = cb_user_listGroups)
+
+
+def cb_user_listGroups(response):
     global processingCommand
-    print("TODO") # TODO
+    print(response)
+    processingCommand = False
+
+# TODO
+def user_createGroup():
+    while True:
+        groupname = input("Group name: ")
+        if len(groupname) <= 2:
+            print("Group name must be longer than 2 characters!")
+        else:
+            sio.emit("server_createGroup", {"groupName": groupname, "owner": account_userName}, callback = cb_user_createGroup)
+            break
+
+def cb_user_createGroup(response):
+    global processingCommand
+    if (response == "ALREADY_EXISTS"):
+        print("Group name is already in use.")
+    elif (response == "OK"):
+        print("Group created.")
+    else:
+        print("Unknown error happened during group creation.")
     processingCommand = False
 
 # TODO
 def user_joinGroup():
+    while True:
+        groupname = input("Group name: ")
+        if len(groupname) < 1:
+            print("Group name can't be blank!")
+        else:
+            sio.emit("server_joinGroup", {"groupName": groupname, "user": account_userName}, callback = cb_user_joinGroup)
+            break
+
+def cb_user_joinGroup(response):
     global processingCommand
-    print("TODO") # TODO
+    if (response == "ALREADY_MEMBER"):
+        print("You are already a member of this group.")
+    elif (response == "OK"):
+        print("You joined the group!")
+    else:
+        print("Unknown error happened during joining the group.")
+    processingCommand = False
+
+    # TODO
+def user_leaveGroup():
+    while True:
+        groupname = input("Group name: ")
+        if len(groupname) < 1:
+            print("Group name can't be blank!")
+        else:
+            sio.emit("server_leaveGroup", {"groupName": groupname, "user": account_userName}, callback = cb_user_leaveGroup)
+            break
+    
+
+def cb_user_leaveGroup(response):
+    global processingCommand
+    if (response == "NOT_MEMBER"):
+        print("You aren't a member of this group.")
+    elif (response == "OK"):
+         print("You left the group!")
+    else:
+        print("Unknown error happened during leaving the group.")
     processingCommand = False
 
 # TODO
 def user_deleteGroup():
+    while True:
+        groupname = input("Group name: ")
+        if len(groupname) < 1:
+            print("Group name can't be blank!")
+        else:
+            sio.emit("server_deleteGroup", {"groupName": groupname, "user": account_userName}, callback = cb_user_deleteGroup)
+            break
+
+def cb_user_deleteGroup(response):
     global processingCommand
-    print("TODO") # TODO
+    if (response == "NOT_OWNER"):
+        print("You aren't the owner of this group, so you cannot delete it!")
+    elif (response == "OK"):
+        print("You deleted the group")
+    else:
+        print("Unknown error happened during deleting the group.")
     processingCommand = False
+
+
 
 # Default message loop after the application started
 def defaultLoop():
@@ -156,23 +236,30 @@ def defaultLoop():
 
 # User session loop for chat
 # If the login was successful we call this function
-def userSessionLoop(username):
+def userSessionLoop():
     global processingCommand
     global userLoggedIn
+    global account_userName
     clearConsole()
-    print("\n\nWelcome " + username + "! :)\n")
-    print("Available commands: create_group | join_group | delete_group | logout")
+    print("\n\nWelcome " + account_userName + "! :)\n")
+    print("Available commands: list_groups | create_group | join_group | leave_group | delete_group | logout")
     while True:
         while processingCommand: # If we are already processing an async command, we shouldn't spam the output, so we wait
             time.sleep(0.1)
         # We aren't in a command processing (anymore)
-        option = input(username + " > ")
-        if option == "create_group":
+        option = input(account_userName + " > ")
+        if option == "list_groups":
+            processingCommand = True
+            user_listGroups()
+        elif option == "create_group":
             processingCommand = True
             user_createGroup()
         elif option == "join_group":
             processingCommand = True
             user_joinGroup()
+        elif option == "leave_group":
+            processingCommand = True
+            user_leaveGroup()
         elif option == "delete_group":
             processingCommand = True
             user_deleteGroup()

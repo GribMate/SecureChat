@@ -42,6 +42,55 @@ async def login_user(sid, message):
     else:
         await sio.emit("client_login_auth", {"response": "INVALID_USER"})
 
+# TODO
+@sio.on("server_getGroups")
+def getGroups(sid):
+    return groups # TODO just the names
+
+# TODO
+@sio.on("server_createGroup")
+def createGroup(sid, message):
+    if message["groupName"] in groups.values():
+        return "ALREADY_EXISTS"
+    else:
+        groups[message["groupName"]] = {"owner": message["owner"], "members": []} # TODO: proper data storage
+        with open(GROUPS_FILE_PATH, "w") as f:
+            print(groups, file = f)
+        return "OK"
+
+# TODO
+@sio.on("server_joinGroup")
+def userJoinGroup(sid, message):
+    if message["user"] in groups[message["groupName"]]["members"]:
+        return "ALREADY_MEMBER"
+    else:
+        groups[message["groupName"]]["members"].append(message["user"])
+        with open(GROUPS_FILE_PATH, "w") as f:
+            print(groups, file = f)
+        return "OK"
+
+# TODO
+@sio.on("server_leaveGroup")
+def userLeaveGroup(sid, message):
+    if message["user"] not in groups[message["groupName"]]["members"]:
+        return "NOT_MEMBER"
+    else:
+        groups[message["groupName"]]["members"].remove(message["user"])
+        with open(GROUPS_FILE_PATH, "w") as f:
+            print(groups, file = f)
+        return "OK"
+
+# TODO
+@sio.on("server_deleteGroup")
+def deleteGroup(sid, message):
+    if message["user"] != groups[message["groupName"]]["owner"]:
+        return "NOT_OWNER"
+    else:
+        del groups[message["groupName"]]
+        with open(GROUPS_FILE_PATH, "w") as f:
+            print(groups, file = f)
+        return "OK"
+
 
 # -------------------------------------------------- SERVER INIT --------------------------------------------------
 
