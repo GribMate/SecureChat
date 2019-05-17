@@ -225,6 +225,20 @@ def cb_user_deleteGroup(response):
         print("Unknown error happened during deleting the group.")
     processingCommand = False
 
+# TODO
+def user_logout():
+    global processingCommand
+    global userLoggedIn
+    global account_currentGroup
+    global account_userName
+    print("Logging out...\n")
+    sio.emit("server_leaveGroup", {"groupName": account_currentGroup, "user": account_userName})
+    userLoggedIn = False
+    account_currentGroup = ""
+    account_userName = ""
+    print("Logged out. Bye!")
+    processingCommand = False
+
 
 
 # Default message loop after the application started
@@ -283,9 +297,8 @@ def userSessionLoop():
             processingCommand = True
             user_deleteGroup()
         elif option == "logout":
-            print("Logging out...\n")
-            userLoggedIn = False
-            processingCommand = False
+            processingCommand = True
+            user_logout()
             break
         else:
             print("\"" + option + "\" is not a valid option!")
