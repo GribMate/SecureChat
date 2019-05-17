@@ -5,8 +5,6 @@ import clientCrypto
 
 # -------------------------------------------------- GLOBALS --------------------------------------------------
 
-PRIVATE_KEY_FILE_PATH = "myPrivateKey.pem" # The path that the client saves its private RSA key file
-
 # Socket.io client definition
 sio = socketio.Client()
 
@@ -18,6 +16,9 @@ userLoggedIn = False
 
 # The username which identifies a user on the server
 account_userName = "" # TODO might need another ID
+
+# The password associated with a registered user (set from local client only)
+account_password = ""
 
 # The group of which the user is currently a member of
 account_currentGroup = ""
@@ -49,6 +50,7 @@ def auth(message):
     global processingCommand
     global userLoggedIn
     global account_userName
+    global account_password
     if message["response"] == "AUTH_SUCCESSFUL":
         # If response is successful, we login with the given user
         print("Login successful!")
@@ -62,6 +64,7 @@ def auth(message):
         print("User doesn't exist, please register first!")
     else:
         print("Unknown login error happened (server response: " + message["response"] + ").\n")
+    account_password = ""
     processingCommand = False
 
 
@@ -95,7 +98,7 @@ def client_register():
     print("Creating account...")
 
     privateKey = clientCrypto.createPrivateKey() # Generating RSA key
-    clientCrypto.saveKeyToFile(privateKey, PRIVATE_KEY_FILE_PATH, password) # Saving encrpyted private key locally
+    clientCrypto.saveKeyToFile(privateKey, username + ".pem", password) # Saving encrpyted private key locally
     publicKey = clientCrypto.getPublicKeyFromPrivateKey(privateKey) # Public key component to send to the server
 
     sio.emit("server_register", {"userName": username, "password": password, "publicKey": publicKey})
@@ -105,6 +108,7 @@ def client_register():
 
 # Login function
 def client_login():
+    global account_password
     while True:
         username = input("Username: ")
         if len(username) < 1:
@@ -117,6 +121,7 @@ def client_login():
             print("Password can't be blank!")
         else:
             break
+    account_password = password
     sio.emit("server_login", {"userName": username, "password": password})
 
 # TODO
@@ -164,7 +169,7 @@ def user_joinGroup():
             print("Group name can't be blank!")
         else:
             account_currentGroup = groupname
-            sio.emit("server_joinGroup", {"groupName": groupname, "user": account_userName}, callback = cb_user_joinGroup)
+            sio.emit("server_joinGroup", {"groupName": groupname, "userName": account_userName}, callback = cb_user_joinGroup)
             break
 
 def cb_user_joinGroup(response):
@@ -187,10 +192,10 @@ def cb_user_joinGroup(response):
     # TODO
 def user_leaveGroup():
     global account_currentGroup
-    if len(account_currentGroup) < 1:
+    if len(account_currentGroup) < 3:
         print("You are not member of any group!")
     else:
-        sio.emit("server_leaveGroup", {"groupName": account_currentGroup, "user": account_userName}, callback = cb_user_leaveGroup)
+        sio.emit("server_leaveGroup", {"groupName": account_currentGroup, "userName": account_userName}, callback = cb_user_leaveGroup)
     
 
 def cb_user_leaveGroup(response):
@@ -210,7 +215,7 @@ def user_deleteGroup():
         if len(groupname) < 1:
             print("Group name can't be blank!")
         else:
-            sio.emit("server_deleteGroup", {"groupName": groupname, "user": account_userName}, callback = cb_user_deleteGroup)
+            sio.emit("server_deleteGroup", {"groupName": groupname, "userName": account_userName}, callback = cb_user_deleteGroup)
             break
 
 def cb_user_deleteGroup(response):
@@ -231,14 +236,35 @@ def user_logout():
     global userLoggedIn
     global account_currentGroup
     global account_userName
+    global account_password
     print("Logging out...\n")
-    sio.emit("server_leaveGroup", {"groupName": account_currentGroup, "user": account_userName})
+    sio.emit("server_leaveGroup", {"groupName": account_currentGroup, "userName": account_userName})
     userLoggedIn = False
     account_currentGroup = ""
     account_userName = ""
+    account_password = ""
     print("Logged out. Bye!")
     processingCommand = False
 
+# TODO
+def user_sendMessage():
+    global account_currentGroup
+    if len(account_currentGroup) < 3:
+        print("You cannot send a message until you join a group.")
+    else:
+        sio.emit("server_getGroupMembers", {"groupName": account_currentGroup}, callback = cb_sendMessage)
+
+def cb_sendMessage(targetUsers):
+    global processingCommand
+    while True:
+        message = input("Your message: ")
+        if len(message) < 1:
+            print("Message cannot be blank!")
+        else:
+            for target in targetUsers:
+                # TODO build socket connection and send message
+            break
+    processingCommand = False
 
 
 # Default message loop after the application started
@@ -275,13 +301,16 @@ def userSessionLoop():
     global account_currentGroup
     clearConsole()
     print("\n\nWelcome " + account_userName + "! :)\n")
-    print("Available commands: list | create | join | leave | delete | logout")
+    print("Available commands: msg | list | create | join | leave | delete | logout")
     while True:
         while processingCommand: # If we are already processing an async command, we shouldn't spam the output, so we wait
             time.sleep(0.1)
         # We aren't in a command processing (anymore)
         option = input(account_userName + " (" + account_currentGroup + ") > ")
-        if option == "list":
+        if option == "msg":
+            processingCommand = True
+            user_sendMessage()
+        elif option == "list":
             processingCommand = True
             user_listGroups()
         elif option == "create":
