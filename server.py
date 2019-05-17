@@ -102,6 +102,12 @@ def getGroupMembers(sid, message):
         membersData.append(data)
     return membersData
 
+# TODO
+@sio.on("server_sendMessage")
+def sendMessage(sid, message):
+    # TODO
+    return
+
 
 # -------------------------------------------------- SERVER INIT --------------------------------------------------
 

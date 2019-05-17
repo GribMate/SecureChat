@@ -20,8 +20,14 @@ account_userName = "" # TODO might need another ID
 # The password associated with a registered user (set from local client only)
 account_password = ""
 
+# The private RSA key, read from file locally
+account_privateKey = ""
+
 # The group of which the user is currently a member of
 account_currentGroup = ""
+
+# Crypto session with other users
+sessions = {}
 
 
 # -------------------------------------------------- DEFAULT CALLBACKS --------------------------------------------------
@@ -51,11 +57,13 @@ def auth(message):
     global userLoggedIn
     global account_userName
     global account_password
+    global account_privateKey
     if message["response"] == "AUTH_SUCCESSFUL":
         # If response is successful, we login with the given user
         print("Login successful!")
         userLoggedIn = True
         account_userName = message["userName"]
+        account_privateKey = clientCrypto.readKeyFromFile(account_userName + ".pem", account_password)
         processingCommand = False
         return userSessionLoop()
     elif message["response"] == "INVALID_PWD":
@@ -261,10 +269,50 @@ def cb_sendMessage(targetUsers):
         if len(message) < 1:
             print("Message cannot be blank!")
         else:
-            for target in targetUsers:
-                # TODO build socket connection and send message
+            for targetUser in targetUsers:
+                checkOrBuildSession(targetUser["userName"], targetUser["publicKey"])
+                sendMessageToTarget(targetUser["userName"], message)
             break
     processingCommand = False
+
+def checkOrBuildSession(userName, publicKey):
+    global sessions
+    if userName not in sessions:
+        sessions[userName] = {"sessionKey": clientCrypto.generateSessionKey(), "publicKey": publicKey, "handshakeDone": "False"}
+        doHandshakeWithUser(userName)
+    elif sessions[userName]["handshakeDone"] == "False":
+        doHandshakeWithUser(userName)
+
+def doHandshakeWithUser(userName):
+    global sessions
+    sessionKey = sessions[userName]["sessionKey"]
+    publicKey = sessions[userName]["publicKey"]
+    encryptedSessionKey = clientCrypto.encryptSessionKey(sessionKey, publicKey)
+    # TODO: send encryptedSessionKey to the other client through the server
+    sessions[userName]["handshakeDone"] = "True"
+
+def sendMessageToTarget(userName, message):
+    global sessions
+    sessionKey = sessions[userName]["sessionKey"]
+    encryptedMessage, macTag, nonce = clientCrypto.encryptMessage(sessionKey, message)
+    # TODO send data to the other client through the server
+
+def handleIncomingHandshake(userName, encryptedSessionKey, publicKey):
+    global account_privateKey
+    global sessions
+    sessionKey = clientCrypto.decryptSessionKey(encryptedSessionKey, account_privateKey)
+    if userName in sessions:
+        del sessions[userName] # We renew the session anyway on an incoming handshake request
+    sessions[userName] = {"sessionKey": sessionKey, "publicKey": publicKey, "handshakeDone": "True"}
+
+def handleIncomingMessage(userName, encryptedMessage, macTag, nonce):
+    global sessions
+    if userName in sessions:
+        if sessions[userName]["handshakeDone"] == "True":
+            sessionKey = sessions[userName]["sessionKey"]
+            message = clientCrypto.decryptMessage(sessionKey, nonce, macTag, encryptedMessage)
+            print(userName + ": " + message + "\n")
+
 
 
 # Default message loop after the application started
