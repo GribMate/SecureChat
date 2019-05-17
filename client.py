@@ -15,7 +15,7 @@ processingCommand = False
 userLoggedIn = False
 
 # The username which identifies a user on the server
-account_userName = "" # TODO might need another ID
+account_userName = ""
 
 # The password associated with a registered user (set from local client only)
 account_password = ""
@@ -27,7 +27,7 @@ account_privateKey = ""
 account_currentGroup = ""
 
 # Crypto session with other users
-sessions = {}
+sessions = dict()
 
 
 # -------------------------------------------------- DEFAULT CALLBACKS --------------------------------------------------
@@ -40,15 +40,17 @@ def on_connect():
 # Message function
 @sio.on("message")
 def on_message(data):
-    print("I received a message: " + str(data, "UTF-8"))
+    return
+    # Not used default direct data callback
 
 # Disconnection function
 @sio.on("disconnect")
 def on_disconnect():
-    print("Client disconnected!")
+    user_logout()
+    print("Client disconnected!\n")
 
 
-# -------------------------------------------------- CLIENT FUNCTIONS --------------------------------------------------
+# -------------------------------------------------- ADMINISTRATIVE FUNCTIONS --------------------------------------------------
 
 # Emtpies the console window
 def clearConsole():
@@ -125,11 +127,34 @@ def cb_user_login(response):
         account_userName = ""
     processingCommand = False
 
-# TODO
+# Logs the user out both in the client and the server
+def user_logout():
+    global processingCommand
+    global userLoggedIn
+    global account_currentGroup
+    global account_userName
+    global account_password
+    global account_privateKey
+    global sessions
+    print("Logging out...\n")
+    sio.emit("server_logout", {"groupName": account_currentGroup, "userName": account_userName})
+    userLoggedIn = False
+    account_currentGroup = ""
+    account_userName = ""
+    account_password = ""
+    account_privateKey = ""
+    sessions = dict()
+    print("Logged out. Bye!")
+    processingCommand = False
+
+
+# -------------------------------------------------- GROUP FUNCTIONS --------------------------------------------------
+
+# Gets a group name list from the server
 def user_listGroups():
     sio.emit("server_getGroups", callback = cb_user_listGroups)
 
-
+# Displays the group name list
 def cb_user_listGroups(response):
     global processingCommand
     print("Currently available groups:")
@@ -137,7 +162,7 @@ def cb_user_listGroups(response):
         print(groupName)
     processingCommand = False
 
-# TODO
+# Creates a new group on the server
 def user_createGroup():
     while True:
         groupname = input("Group name: ")
@@ -147,6 +172,7 @@ def user_createGroup():
             sio.emit("server_createGroup", {"groupName": groupname, "owner": account_userName}, callback = cb_user_createGroup)
             break
 
+# Displays group creation response
 def cb_user_createGroup(response):
     global processingCommand
     if (response == "ALREADY_EXISTS"):
@@ -157,7 +183,7 @@ def cb_user_createGroup(response):
         print("Unknown error happened during group creation.")
     processingCommand = False
 
-# TODO
+# Attempts to join to a group
 def user_joinGroup():
     global processingCommand
     global account_currentGroup
@@ -175,6 +201,7 @@ def user_joinGroup():
             sio.emit("server_joinGroup", {"groupName": groupname, "userName": account_userName}, callback = cb_user_joinGroup)
             break
 
+# Displays joining response and empties local variable if needed
 def cb_user_joinGroup(response):
     global processingCommand
     global account_currentGroup
@@ -192,7 +219,7 @@ def cb_user_joinGroup(response):
         print("Unknown error happened during joining the group.")
     processingCommand = False
 
-    # TODO
+# Attempts to leave a group
 def user_leaveGroup():
     global account_currentGroup
     if len(account_currentGroup) < 3:
@@ -200,7 +227,7 @@ def user_leaveGroup():
     else:
         sio.emit("server_leaveGroup", {"groupName": account_currentGroup, "userName": account_userName}, callback = cb_user_leaveGroup)
     
-
+# Displays group leave response
 def cb_user_leaveGroup(response):
     global processingCommand
     global account_currentGroup
@@ -211,7 +238,7 @@ def cb_user_leaveGroup(response):
         print("Unknown error happened during leaving the group.")
     processingCommand = False
 
-# TODO
+# Attempts to delete a group (only possible if owned by the current user)
 def user_deleteGroup():
     while True:
         groupname = input("Group name: ")
@@ -221,6 +248,7 @@ def user_deleteGroup():
             sio.emit("server_deleteGroup", {"groupName": groupname, "userName": account_userName}, callback = cb_user_deleteGroup)
             break
 
+# Displayes group delete response
 def cb_user_deleteGroup(response):
     global processingCommand
     if (response == "NOT_OWNER"):
@@ -233,34 +261,19 @@ def cb_user_deleteGroup(response):
         print("Unknown error happened during deleting the group.")
     processingCommand = False
 
-# TODO
-def user_logout():
-    global processingCommand
-    global userLoggedIn
-    global account_currentGroup
-    global account_userName
-    global account_password
-    global account_privateKey
-    global sessions
-    print("Logging out...\n")
-    sio.emit("server_logout", {"groupName": account_currentGroup, "userName": account_userName})
-    userLoggedIn = False
-    account_currentGroup = ""
-    account_userName = ""
-    account_password = ""
-    account_privateKey = ""
-    sessions = {}
-    print("Logged out. Bye!")
-    processingCommand = False
 
-# TODO
+# -------------------------------------------------- MESSAGE FUNCTIONS --------------------------------------------------
+
+# Sends a message to everyone in the group
 def user_sendMessage():
     global account_currentGroup
     if len(account_currentGroup) < 3:
         print("You cannot send a message until you join a group.")
     else:
+        # First of all, we request a list of targeted users from the server (username and public key)
         sio.emit("server_getGroupMembers", {"groupName": account_currentGroup}, callback = cb_sendMessage)
 
+# Handles the list, builds encrypted connections (if needed) then sends the message
 def cb_sendMessage(targetUsers):
     global processingCommand
     while True:
@@ -270,50 +283,63 @@ def cb_sendMessage(targetUsers):
         else:
             for targetUser in targetUsers:
                 if targetUser["userName"] != account_userName:
-                    checkOrBuildSession(targetUser["userName"], targetUser["publicKey"])
-                    sendMessageToTarget(targetUser["userName"], message)
+                    checkOrBuildSession(targetUser["userName"], targetUser["publicKey"]) # Building session (if needed)
+                    sendMessageToTarget(targetUser["userName"], message) # Sending message
             break
     processingCommand = False
 
+# Builds or refreshes a connection between two clients
 def checkOrBuildSession(userName, publicKey):
     global sessions
-    if userName not in sessions:
-        sessions[userName] = {"sessionKey": clientCrypto.generateSessionKey(), "publicKey": publicKey, "handshakeDone": "False"}
+    if userName not in sessions: # No session built before
+        sessions[userName] = {"sessionKey": clientCrypto.generateSessionKey(), "publicKey": publicKey, "handshakeDone": "False"} # New session, needs handshake first
         sendHandshake(userName)
-    elif sessions[userName]["handshakeDone"] == "False":
+    elif sessions[userName]["handshakeDone"] == "False": # There was a session, but handshake is needed (likely because session timed out)
         sendHandshake(userName)
 
+# Establishes crypto handshake with a client
 def sendHandshake(userName):
     global sessions
     global account_userName
     sessionKey = sessions[userName]["sessionKey"]
-    publicKey =  clientCrypto.getKeyFromEncodedData(sessions[userName]["publicKey"])
-    encryptedSessionKey = clientCrypto.encryptSessionKey(sessionKey, publicKey)
+    publicKey =  clientCrypto.getKeyFromEncodedData(sessions[userName]["publicKey"]) # Gets the public RSA key from the other client
+    encryptedSessionKey = clientCrypto.encryptSessionKey(sessionKey, publicKey) # Encrypts new symmetric session key with RSA public key
+    # Base64 encoding / decoding seems to be needed, since sio.emit() otherwise disconnects the client,
+    # however sending bytes should be supported according to the API documentation
     sio.emit("server_passHandshake", {"senderUserName": account_userName, "targetUserName": userName,
     "encryptedSessionKey": base64.b64encode(encryptedSessionKey)})
     sessions[userName]["handshakeDone"] = "True"
 
+# Sends a private, encrypted message to a client (with previous session established)
 def sendMessageToTarget(userName, message):
     global sessions
     sessionKey = sessions[userName]["sessionKey"]
-    encryptedMessage, macTag, nonce = clientCrypto.encryptMessage(sessionKey, message)
+    encryptedMessage, macTag, nonce = clientCrypto.encryptMessage(sessionKey, message) # Encrypting message with session key
+    # Base64 encoding / decoding seems to be needed, since sio.emit() otherwise disconnects the client,
+    # however sending bytes should be supported according to the API documentation
     sio.emit("server_passMessage", {"senderUserName": account_userName, "targetUserName": userName,
     "encryptedMessage": base64.b64encode(encryptedMessage), "macTag": base64.b64encode(macTag), "nonce": base64.b64encode(nonce)})
 
+# Receives handshake, initialized by another client
 @sio.on("client_receiveHandshake")
 def receiveHandshake(message):
+    # Base64 encoding / decoding seems to be needed, since sio.emit() otherwise disconnects the client,
+    # however sending bytes should be supported according to the API documentation
     global account_privateKey
     global sessions
     userName = message["senderUserName"]
     encryptedSessionKey = base64.b64decode(message["encryptedSessionKey"])
     publicKey = message["publicKey"]
-    sessionKey = clientCrypto.decryptSessionKey(encryptedSessionKey, account_privateKey)
+    sessionKey = clientCrypto.decryptSessionKey(encryptedSessionKey, account_privateKey) # Decrypting session key with private RSA key
     if userName in sessions:
         del sessions[userName] # We renew the session anyway on an incoming handshake request
     sessions[userName] = {"sessionKey": sessionKey, "publicKey": publicKey, "handshakeDone": "True"}
 
+# Receives a private encrypted message from another client
 @sio.on("client_receiveMessage")
 def receiveMessage(message):
+    # Base64 encoding / decoding seems to be needed, since sio.emit() otherwise disconnects the client,
+    # however sending bytes should be supported according to the API documentation
     global sessions
     userName = message["senderUserName"]
     encryptedMessage = base64.b64decode(message["encryptedMessage"])
@@ -322,10 +348,11 @@ def receiveMessage(message):
     if userName in sessions:
         if sessions[userName]["handshakeDone"] == "True":
             sessionKey = sessions[userName]["sessionKey"]
-            message = clientCrypto.decryptMessage(sessionKey, nonce, macTag, encryptedMessage)
+            message = clientCrypto.decryptMessage(sessionKey, nonce, macTag, encryptedMessage) # Decrypting with session key
             print(userName + ": " + message + "\n")
 
 
+# -------------------------------------------------- COMMAND LOOP FUNCTIONS --------------------------------------------------
 
 # Default message loop after the application started
 def defaultLoop():

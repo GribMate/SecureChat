@@ -1,5 +1,5 @@
-from aiohttp import web
 import socketio, base64
+from aiohttp import web
 
 
 # -------------------------------------------------- GLOBALS --------------------------------------------------
@@ -14,18 +14,20 @@ sio = socketio.AsyncServer()
 app = web.Application()
 
 # Public user data
-users = {}
+users = dict()
 
 # Public group data
-groups = {}
+groups = dict()
 
 # Active, currently logged in clients (is not persisted) - key: username, data: SID
-clients = {}
+clients = dict()
 
 
-# -------------------------------------------------- CALLBACKS --------------------------------------------------
+# -------------------------------------------------- ADMINISTRATIVE FUNCTIONS --------------------------------------------------
 
-# User registration
+# TODO Registration and login should not send the password via cleartext, it should utilize the RSA keypairs generated via the client
+
+# User registration, registers a new client (name, password, public RSA key)
 @sio.on("server_register")
 async def register_user(sid, message):
     global users
@@ -33,7 +35,7 @@ async def register_user(sid, message):
     with open(USERS_FILE_PATH, "w") as f:
         print(users, file = f)
 
-# User login
+# User login, registers the client SID
 @sio.on("server_login")
 async def login_user(sid, message):
     global clients
@@ -44,24 +46,38 @@ async def login_user(sid, message):
                 return "AUTH_SUCCESSFUL"
     return "ERROR"
 
-# TODO
+# User logout / disconnect, removes the client from active list
+@sio.on("server_logout")
+def logout(sid, message):
+    global groups
+    if len(message["groupName"]) > 2:
+        if message["userName"] in groups[message["groupName"]]["members"]:
+            groups[message["groupName"]]["members"].remove(message["userName"])
+            with open(GROUPS_FILE_PATH, "w") as f:
+                print(groups, file = f)
+    del clients[message["userName"]]
+
+
+# -------------------------------------------------- GROUP FUNCTIONS --------------------------------------------------
+
+# Returns the list of names of active groups
 @sio.on("server_getGroups")
 def getGroups(sid):
-    return list(groups.keys()) # TODO just the names
+    return list(groups.keys())
 
-# TODO
+# Creates a new group, owned by the requesting user
 @sio.on("server_createGroup")
 def createGroup(sid, message):
     global groups
     if message["groupName"] in groups.values():
         return "ALREADY_EXISTS"
     else:
-        groups[message["groupName"]] = {"owner": message["owner"], "members": []}
+        groups[message["groupName"]] = {"owner": message["owner"], "members": list()}
         with open(GROUPS_FILE_PATH, "w") as f:
             print(groups, file = f)
         return "OK"
 
-# TODO
+# Joins the given user to the requested group
 @sio.on("server_joinGroup")
 def userJoinGroup(sid, message):
     global groups
@@ -75,7 +91,7 @@ def userJoinGroup(sid, message):
             print(groups, file = f)
         return "OK"
 
-# TODO
+# Removes the given user from the group they are in (if any)
 @sio.on("server_leaveGroup")
 def userLeaveGroup(sid, message):
     global groups
@@ -84,9 +100,10 @@ def userLeaveGroup(sid, message):
         print(groups, file = f)
     return "OK"
 
-# TODO
+# Deletes a group
 @sio.on("server_deleteGroup")
 def deleteGroup(sid, message):
+    # TODO: Should notify active member clients to remove themselves from given group
     global groups
     if message["userName"] != groups[message["groupName"]]["owner"]:
         return "NOT_OWNER"
@@ -99,29 +116,24 @@ def deleteGroup(sid, message):
                 print(groups, file = f)
             return "OK"
 
-# TODO
-@sio.on("server_logout")
-def logout(sid, message):
-    global groups
-    if len(message["groupName"]) > 2:
-        if message["userName"] in groups[message["groupName"]]["members"]:
-            groups[message["groupName"]]["members"].remove(message["userName"])
-            with open(GROUPS_FILE_PATH, "w") as f:
-                print(groups, file = f)
-    del clients[message["userName"]]
-
-# TODO
+# Returns all members of a given group (name and public RSA key)
 @sio.on("server_getGroupMembers")
 def getGroupMembers(sid, message):
-    membersData = []
+    membersData = list()
     for userName in groups[message["groupName"]]["members"]:
         data = {"userName": userName, "publicKey": users[userName]["publicKey"]}
         membersData.append(data)
     return membersData
 
-# TODO
+
+# -------------------------------------------------- MESSAGE FUNCTIONS --------------------------------------------------
+
+# Passes a handshake (session key) to a client from another one
+# Note, that the server cannot decrypt the key, lacking the needed private RSA key
 @sio.on("server_passHandshake")
 async def passHandshake(sid, message):
+    # Base64 encoding / decoding seems to be needed, since sio.emit() otherwise disconnects the client,
+    # however sending bytes should be supported according to the API documentation
     targetName = message["targetUserName"]
     senderName = message["senderUserName"]
     encryptedSessionKey = base64.b64decode(message["encryptedSessionKey"])
@@ -132,9 +144,12 @@ async def passHandshake(sid, message):
             await sio.emit("client_receiveHandshake", {"senderUserName": senderName, "encryptedSessionKey": base64.b64encode(encryptedSessionKey),
             "publicKey": publicKey}, room = targetSID)
 
-# TODO
+# Passes a group message to a client from another one
+# Note, that the server cannot decrypt the message, lacking the needed session key
 @sio.on("server_passMessage")
 async def passMessage(sid, message):
+    # Base64 encoding / decoding seems to be needed, since sio.emit() otherwise disconnects the client,
+    # however sending bytes should be supported according to the API documentation
     targetName = message["targetUserName"]
     senderName = message["senderUserName"]
     encryptedMessage = base64.b64decode(message["encryptedMessage"])
