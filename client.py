@@ -208,7 +208,7 @@ def cb_user_joinGroup(response):
     if (response == "GROUP_NOT_EXIST"):
         account_currentGroup = "" # We clear the variable, since joining failed
         print("The group does not exist.")
-    if (response == "ALREADY_MEMBER"):
+    elif (response == "ALREADY_MEMBER"):
         # We leave the variable as is, since user is a member of given group
         print("You are already a member of this group.")
     elif (response == "OK"):
