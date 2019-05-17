@@ -105,6 +105,16 @@ def deleteGroup(sid, message):
             return "OK"
 
 # TODO
+@sio.on("server_logout")
+def logout(sid, message):
+    global groups
+    if message["userName"] in groups[message["groupName"]]["members"]:
+        groups[message["groupName"]]["members"].remove(message["userName"])
+        with open(GROUPS_FILE_PATH, "w") as f:
+            print(groups, file = f)
+    del clients[message["userName"]]
+
+# TODO
 @sio.on("server_getGroupMembers")
 def getGroupMembers(sid, message):
     membersData = []

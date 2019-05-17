@@ -246,12 +246,16 @@ def user_logout():
     global account_currentGroup
     global account_userName
     global account_password
+    global account_privateKey
+    global sessions
     print("Logging out...\n")
-    sio.emit("server_leaveGroup", {"groupName": account_currentGroup, "userName": account_userName})
+    sio.emit("server_logout", {"groupName": account_currentGroup, "userName": account_userName})
     userLoggedIn = False
     account_currentGroup = ""
     account_userName = ""
     account_password = ""
+    account_privateKey = ""
+    sessions = {}
     print("Logged out. Bye!")
     processingCommand = False
 
